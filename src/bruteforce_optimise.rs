@@ -8,9 +8,10 @@ pub struct VariableBaseSystem {
     pub max_value: usize,
 }
 
-/// Single field tuple struct to wrap over a Vec\<usize\>.
-/// Use self.0 to access the Vec.
-pub struct VariableRepresentation(Vec<usize>);
+/// A type alias over a Vec<usize>.
+/// 
+/// Short for "VariableBaseRepresentation".
+type VarBaseRepr = Vec<usize>;
 
 impl VariableBaseSystem {
     /// bases parameter details:
@@ -31,22 +32,22 @@ impl VariableBaseSystem {
     /// Interprets a value into a representation of the bases specified at instantiation
     /// 
     /// E.g The value 54 encoded to the bases (5, 4, 3) will be represented as (4, 2, 2)
-    pub fn encode_value(&self, n: &usize) -> VariableRepresentation {
-        let mut representation = VariableRepresentation(Vec::new());
+    pub fn encode_value(&self, n: &usize) -> VarBaseRepr {
+        let mut representation: VarBaseRepr = Vec::new();
         let mut carry_over = n.clone();
         for i in 0..self.bases.len() {
             let curr_base = self.bases[i];
-            representation.0.push(carry_over % curr_base);
+            representation.push(carry_over % curr_base);
             carry_over = carry_over / curr_base;
         }
         return representation;
     }
     /// Interprets a representation into a value. Inverse of encode_value
-    pub fn decode_representation(&self, repr: &VariableRepresentation) -> usize {
+    pub fn decode_representation(&self, repr: &VarBaseRepr) -> usize {
         let mut sum: usize = 0;
         let mut position_mult: usize = 1;
         for (pos, base) in self.bases.iter().enumerate() {
-            sum += repr.0[pos] * position_mult;
+            sum += repr[pos] * position_mult;
             position_mult *= base;
         }
         return sum;
@@ -85,10 +86,10 @@ impl PermutationsHelper {
     }
 
     /// Convert a representation from base_encoder into a distinct permutation
-    pub fn encoded_to_perm(&self, encoded: &VariableRepresentation) -> Vec<usize> {
+    pub fn encoded_to_perm(&self, encoded: &VarBaseRepr) -> Vec<usize> {
         let mut output_perm: Vec<usize> = vec![0; self.sequence_n];
         for (pos, element) in self.core_sequence.iter().enumerate() {
-            let mut shift = encoded.0[pos];
+            let mut shift = encoded[pos];
             let mut target: usize = 0;
             // Use each number in the encoded Vec to know how much to shift along
             // before inserting. Positions already filled in output_perm are auto-skipped.
@@ -108,7 +109,7 @@ impl PermutationsHelper {
 
     /// Returns a vector of encoded representations for permutations whose 
     /// starting sequence matches perm_target.
-    pub fn possible_encodes(&self, perm_target: &Vec<usize>) -> Vec<VariableRepresentation> {
+    pub fn possible_encodes(&self, perm_target: &Vec<usize>) -> Vec<VarBaseRepr> {
         let filler = self.sequence_n+1;
         let mut working_space: Vec<usize> = vec![filler; self.sequence_n];
         let mut encoded_pos_possibilities: Vec<Vec<usize>> = vec![Vec::new(); self.sequence_n];
@@ -173,14 +174,14 @@ impl PermutationsHelper {
             bases.push(possibilites.len());
         }
         let indexer = VariableBaseSystem::new(bases);
-        let mut repr_possibilities: Vec<VariableRepresentation> = Vec::with_capacity(indexer.max_value);
+        let mut repr_possibilities: Vec<VarBaseRepr> = Vec::with_capacity(indexer.max_value);
         // Using VariableBaseSystem to iterate through all combinations of encoded_pos_possibilities
         // and store each combination into repr_possiblities.
         for value in 0..indexer.max_value {
             let curr_indexes = indexer.encode_value(&value);
-            let mut repr = VariableRepresentation(Vec::new());
-            for i in 0..curr_indexes.0.len() {
-                repr.0.push(encoded_pos_possibilities[i][curr_indexes.0[i]].clone());
+            let mut repr: VarBaseRepr = Vec::new();
+            for i in 0..curr_indexes.len() {
+                repr.push(encoded_pos_possibilities[i][curr_indexes[i]].clone());
             }
             repr_possibilities.push(repr);
         }
