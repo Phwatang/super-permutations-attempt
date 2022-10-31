@@ -1,8 +1,6 @@
-#[path="../src/bruteforce.rs"]
-mod bruteforce;
+use super_permutations_attempt::{bruteforce, bruteforce_optimise};
+use super_permutations_attempt::base::SuperPermHandling;
 
-#[path="../src/bruteforce_optimise.rs"]
-mod bruteforce_optimise;
 
 use criterion::{
     black_box,
@@ -13,17 +11,17 @@ use criterion::{
 
 
 fn bruteforce_test(c: &mut Criterion) {
-    let n: usize = 6;
-    let superperm = black_box(bruteforce::create_superperm(n));
+    let n: usize = 5;
+    let superperm = black_box(bruteforce::Handle::create_superperm(n));
 
     let mut bruteforce_group = c.benchmark_group("Brute Force");
     bruteforce_group.bench_function(
         "Creation", 
-        |b| b.iter(|| bruteforce::create_superperm(n))
+        |b| b.iter(|| bruteforce::Handle::create_superperm(n))
     );
     bruteforce_group.bench_function(
         "Checking", 
-        |b| b.iter(|| bruteforce::check_superperm(&superperm, n))
+        |b| b.iter(|| bruteforce::Handle::check_superperm(&superperm, n))
     );
     bruteforce_group.finish();
 
@@ -31,20 +29,19 @@ fn bruteforce_test(c: &mut Criterion) {
 
 fn bruteforce_optimise_test(c: &mut Criterion) {
     let n: usize = 5;
-    let superperm = black_box(bruteforce::create_superperm(n));
+    let superperm = black_box(bruteforce::Handle::create_superperm(n));
 
     let mut bruteforce_optimise_group = c.benchmark_group("Brute Force Optimised");
-    let p = bruteforce_optimise::PermutationsHelper::new(n);
     bruteforce_optimise_group.bench_function(
         "Creation",
-        |b| b.iter(|| p.create_superperm())
+        |b| b.iter(|| bruteforce_optimise::Handle::create_superperm(n))
     );
     bruteforce_optimise_group.bench_function(
         "Checking", 
-        |b| b.iter(|| p.check_superperm(&superperm))
+        |b| b.iter(|| bruteforce_optimise::Handle::check_superperm(&superperm, n))
     );
     bruteforce_optimise_group.finish();
 }
 
-criterion_group!(benches, bruteforce_optimise_test);
+criterion_group!(benches, bruteforce_test, bruteforce_optimise_test);
 criterion_main!(benches);

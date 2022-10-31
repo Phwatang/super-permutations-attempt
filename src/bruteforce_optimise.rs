@@ -2,6 +2,8 @@
 // Same goals and fundamental algorithims as bruteforce_no_optimise
 // except optimisations have been made using better data structuring.
 
+use crate::base::*;
+
 /// Class to encode any value into a different base where
 /// each "position" can be of a different base
 pub struct VariableBaseSystem {
@@ -252,15 +254,15 @@ impl PermutationsHelper {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub struct Handle;
+impl SuperPermHandling for Handle {
+    fn check_superperm(sequence: &Vec<usize>, n_tokens: usize) -> bool {
+        return PermutationsHelper::new(n_tokens).check_superperm(sequence);
+    }
 
-    #[test]
-    fn basic_check() {
-        for n in 1..6 {
-            let p = PermutationsHelper::new(n);
-            assert!(p.check_superperm(&p.create_superperm()));
-        }
+    fn create_superperm(n_tokens: usize) -> Vec<usize> {
+        return PermutationsHelper::new(n_tokens).create_superperm();
     }
 }
+
+
