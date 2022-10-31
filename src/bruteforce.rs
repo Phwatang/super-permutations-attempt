@@ -1,6 +1,8 @@
+#![allow(dead_code)]
 // Functions to generate and check a superperm with nieve/ignorant
 // bruteforce methods. Absolutely no optimisations have been made
 use itertools::Itertools;
+
 
 /// Return a vec containing all possible permutations of the sequence [1..n]
 /// E.g generate_perms(2) = [[1,2], [2,1]]
@@ -15,7 +17,7 @@ fn generate_perms(n: usize) -> Vec<Vec<usize>> {
 
 /// Check if a vector of numbers is a valid superpermutation for a sequence of [1..perm_n]
 /// E.g check_superperm([1,2,1], 2) will check if [1,2,1] is a superperm of [1,2]
-pub fn check_superperm(potential_super: Vec<usize>, perm_n: usize) -> bool {
+pub fn check_superperm(potential_super: &Vec<usize>, perm_n: usize) -> bool {
     // Brute force method
     let perms = generate_perms(perm_n);
     // Create boolean for each perm to check
@@ -44,20 +46,20 @@ pub fn check_superperm(potential_super: Vec<usize>, perm_n: usize) -> bool {
 /// E.g create_superperm(3) = [1,2,3,1,2,1,3,2,1]
 pub fn create_superperm(perm_n: usize) -> Vec<usize> {
     let mut superperm: Vec<usize> = Vec::new();
-    let perms = generate_perms(perm_n);
-    let mut perm_checklist: Vec<bool> = vec![false; perms.len()];
+    let all_perms = generate_perms(perm_n);
+    let mut perm_checklist: Vec<bool> = vec![false; all_perms.len()];
     // Set an initial sequence to superperm before starting algo
-    superperm.append(&mut perms[0].clone());
+    superperm.append(&mut all_perms[0].clone());
     perm_checklist[0] = true;
     // Loop for n possible permutations
-    for _ in 0..perms.len() {
+    for _ in 0..all_perms.len() {
         // Loop to grab biggest trailing size then smallest
         for i in (0..perm_n).rev() {
             let mut perm_matched = false;
             // Retrieve a slice of the trailing elements in superperm
             let trailing = &superperm.clone()[superperm.len()-i..];
             // Check if trailing equals the starting of any perms left to be checked off
-            for (pos, perm) in perms.iter().enumerate() {
+            for (pos, perm) in all_perms.iter().enumerate() {
                 if &perm[0..i] == trailing && perm_checklist[pos] == false {
                     // Check off the perm and append on the rest of the perm onto the superperm
                     perm_matched = true;
@@ -74,12 +76,20 @@ pub fn create_superperm(perm_n: usize) -> Vec<usize> {
             // When i = 0, the trailing sequence will be empty []. In this case the first unchecked
             // permutation will get appended onto the superperm fully
         }
+
+        // Reaching this point, one permutation is guaranteed to be check off
     }
     return superperm;
 }
 
-pub fn test(perm_size: usize) {
-    let seq = create_superperm(perm_size);
-    println!("Superperm: {:?}\nlength: {}", seq, seq.len());
-    println!("Validity check: {}", check_superperm(seq, perm_size));
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_check() {
+        for n in 1..6 {
+            assert!(check_superperm(&create_superperm(n), n));
+        }
+    }
 }

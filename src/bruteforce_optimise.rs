@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // Same goals and fundamental algorithims as bruteforce_no_optimise
 // except optimisations have been made using better data structuring.
 
@@ -19,6 +20,7 @@ impl VariableBaseSystem {
     ///  - Values in the front of vec refer to least significant positions.
     ///  - It also indirectly sets the number of positions available.
     pub fn new(bases: Vec<usize>) -> VariableBaseSystem{
+        // Calculate maximum representable value with the bases passed in
         let mut max: usize = 1;
         for base in &bases {
             max *= base;
@@ -32,13 +34,12 @@ impl VariableBaseSystem {
     /// Interprets a value into a representation of the bases specified at instantiation
     /// 
     /// E.g The value 54 encoded to the bases (5, 4, 3) will be represented as (4, 2, 2)
-    pub fn encode_value(&self, n: &usize) -> VarBaseRepr {
-        let mut representation: VarBaseRepr = Vec::new();
-        let mut carry_over = n.clone();
-        for i in 0..self.bases.len() {
-            let curr_base = self.bases[i];
-            representation.push(carry_over % curr_base);
-            carry_over = carry_over / curr_base;
+    pub fn encode_value(&self, val: &usize) -> VarBaseRepr {
+        let mut representation: VarBaseRepr = vec![0; self.bases.len()];
+        let mut carry_over = val.clone();
+        for (i, base) in self.bases.iter().enumerate() {
+            representation[i] = carry_over % base;
+            carry_over = carry_over / base;
         }
         return representation;
     }
@@ -61,7 +62,7 @@ pub struct PermutationsHelper {
     pub base_encoder: VariableBaseSystem,
 }
 impl PermutationsHelper {
-    // Why use VariableBaseSystem for permutations:
+    // Why use VariableBaseSystem for permutations?
     // Imagine the sequence [1, 2, 3] and all its permutations.
     // When creating a permutation, we have 3 positions to fill up.
     // We insert "1" in one of the three positions. Two positions are left (e.g [_, 1, _])
@@ -85,7 +86,7 @@ impl PermutationsHelper {
         return obj;
     }
 
-    /// Convert a representation from base_encoder into a distinct permutation
+    /// Convert a VariableBaseRepresentation into a distinct permutation
     pub fn encoded_to_perm(&self, encoded: &VarBaseRepr) -> Vec<usize> {
         let mut output_perm: Vec<usize> = vec![0; self.sequence_n];
         for (pos, element) in self.core_sequence.iter().enumerate() {
@@ -168,6 +169,7 @@ impl PermutationsHelper {
                 }
             }
         }
+
         // Start combining the numbers at each encoded position into a list of encoded representations
         let mut bases: Vec<usize> = Vec::with_capacity(self.sequence_n);
         for possibilites in &encoded_pos_possibilities {
@@ -175,6 +177,7 @@ impl PermutationsHelper {
         }
         let indexer = VariableBaseSystem::new(bases);
         let mut repr_possibilities: Vec<VarBaseRepr> = Vec::with_capacity(indexer.max_value);
+
         // Using VariableBaseSystem to iterate through all combinations of encoded_pos_possibilities
         // and store each combination into repr_possiblities.
         for value in 0..indexer.max_value {
@@ -213,14 +216,13 @@ impl PermutationsHelper {
 
     /// Returns a valid superpermutation of self.core_sequence
     pub fn create_superperm(&self) -> Vec<usize> {
-        let mut superperm: Vec<usize> = Vec::new();
+        // Set an intial sequence to build the superperm from before starting algo
+        let mut superperm: Vec<usize> = (1..self.sequence_n+1).collect();
         let mut perm_checklist: Vec<bool> = vec![false; self.base_encoder.max_value];
-        // Set an intial sequence to superperm before starting algo
-        let mut starter: Vec<usize> = (1..self.sequence_n+1).collect();
-        superperm.append(&mut starter);
         perm_checklist[0] = true;
+
         // Loop for all possible permutations to be covered
-        for _ in 0..self.base_encoder.max_value {
+        for _ in 1..self.base_encoder.max_value {
             // Loop to grab the trailing sequences of superperm
             for i in (0..self.sequence_n).rev() {
                 let mut perm_matched = false;
@@ -250,9 +252,15 @@ impl PermutationsHelper {
     }
 }
 
-pub fn test(n: usize) {
-    let perm_obj = PermutationsHelper::new(n);
-    let superperm = perm_obj.create_superperm();
-    println!("Superperm: {:?}\nlength: {}", superperm, superperm.len());
-    println!("Validity check: {}", perm_obj.check_superperm(&superperm));
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_check() {
+        for n in 1..6 {
+            let p = PermutationsHelper::new(n);
+            assert!(p.check_superperm(&p.create_superperm()));
+        }
+    }
 }

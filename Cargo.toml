@@ -1,5 +1,5 @@
 [package]
-name = "SuperPermAttempt"
+name = "super-permutations-attempt"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,3 +7,10 @@ edition = "2021"
 
 [dependencies]
 itertools = "0.10.2"
+
+[dev-dependencies]
+criterion = "0.4.0"
+
+[[bench]]
+name = "speed_test"
+harness = false
