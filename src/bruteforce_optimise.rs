@@ -6,28 +6,29 @@ use crate::base::*;
 
 /// Class to encode any value into a different base where
 /// each "position" can be of a different base
-pub struct VariableBaseSystem {
+pub struct MixedRadix {
+    /// The base of each position for this system
     pub bases: Vec<usize>,
+    /// The first integer above 0 that is unrepresentable with the bases given
     pub max_value: usize,
 }
 
-/// A type alias over a Vec<usize>.
-/// 
-/// Short for "VariableBaseRepresentation".
-type VarBaseRepr = Vec<usize>;
+/// Short for "Mixed Radix Representation".
+/// Data type for a number represented in a mixed radix system
+type MixedRadixRepr = Vec<usize>;
 
-impl VariableBaseSystem {
+impl MixedRadix {
     /// bases parameter details:
     ///  - Vec passed in expected to be the base for each position,
     ///  - Values in the front of vec refer to least significant positions.
     ///  - It also indirectly sets the number of positions available.
-    pub fn new(bases: Vec<usize>) -> VariableBaseSystem{
+    pub fn new(bases: Vec<usize>) -> MixedRadix{
         // Calculate maximum representable value with the bases passed in
         let mut max: usize = 1;
         for base in &bases {
             max *= base;
         }
-        return VariableBaseSystem {
+        return MixedRadix {
             bases: bases,
             max_value: max,
         }
@@ -36,8 +37,8 @@ impl VariableBaseSystem {
     /// Interprets a value into a representation of the bases specified at instantiation
     /// 
     /// E.g The value 54 encoded to the bases (5, 4, 3) will be represented as (4, 2, 2)
-    pub fn encode_value(&self, val: &usize) -> VarBaseRepr {
-        let mut representation: VarBaseRepr = vec![0; self.bases.len()];
+    pub fn encode_value(&self, val: &usize) -> MixedRadixRepr {
+        let mut representation: MixedRadixRepr = vec![0; self.bases.len()];
         let mut carry_over = val.clone();
         for (i, base) in self.bases.iter().enumerate() {
             representation[i] = carry_over % base;
@@ -46,7 +47,7 @@ impl VariableBaseSystem {
         return representation;
     }
     /// Interprets a representation into a value. Inverse of encode_value
-    pub fn decode_representation(&self, repr: &VarBaseRepr) -> usize {
+    pub fn decode_representation(&self, repr: &MixedRadixRepr) -> usize {
         let mut sum: usize = 0;
         let mut position_mult: usize = 1;
         for (pos, base) in self.bases.iter().enumerate() {
@@ -57,14 +58,44 @@ impl VariableBaseSystem {
     }
 }
 
+// implementing iteration over MixedRadix
+// Used: https://stackoverflow.com/questions/68606470/how-to-return-a-reference-when-implementing-an-iterator
+pub struct MixedRadixIter<'a> {
+    system: &'a MixedRadix,
+    i: usize,
+}
+impl<'a> Iterator for MixedRadixIter<'a> {
+    type Item = MixedRadixRepr;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.i >= self.system.max_value {
+            return None;
+        } else {
+            let output = self.system.encode_value(&self.i);
+            self.i += 1;
+            return Some(output);
+        }
+    }
+}
+impl<'a> IntoIterator for &'a MixedRadix {
+    type Item = MixedRadixRepr;
+    type IntoIter = MixedRadixIter<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        MixedRadixIter {
+            system: self,
+            i: 0,
+        }
+    }
+}
+
+
 /// Class to help with the handling of permutations for a sequence of the form: (1,2,3,..,n)
 pub struct PermutationsHelper {
     pub sequence_n: usize,
     pub core_sequence: Vec<usize>,
-    pub base_encoder: VariableBaseSystem,
+    pub base_encoder: MixedRadix,
 }
 impl PermutationsHelper {
-    // Why use VariableBaseSystem for permutations?
+    // Why use MixedRadix for permutations?
     // Imagine the sequence [1, 2, 3] and all its permutations.
     // When creating a permutation, we have 3 positions to fill up.
     // We insert "1" in one of the three positions. Two positions are left (e.g [_, 1, _])
@@ -83,114 +114,101 @@ impl PermutationsHelper {
         let obj = PermutationsHelper{
             sequence_n: n,
             core_sequence: (1..n+1).collect(),
-            base_encoder: VariableBaseSystem::new(bases), 
+            base_encoder: MixedRadix::new(bases), 
         };
         return obj;
     }
 
     /// Convert a VariableBaseRepresentation into a distinct permutation
-    pub fn encoded_to_perm(&self, encoded: &VarBaseRepr) -> Vec<usize> {
+    pub fn encoded_to_perm(&self, encoded: &MixedRadixRepr) -> Vec<usize> {
         let mut output_perm: Vec<usize> = vec![0; self.sequence_n];
-        for (pos, element) in self.core_sequence.iter().enumerate() {
-            let mut shift = encoded[pos];
-            let mut target: usize = 0;
+        for (pos, token) in self.core_sequence.iter().enumerate() {
+            let shift = encoded[pos];
+            let mut ind: usize = 0;
+
             // Use each number in the encoded Vec to know how much to shift along
-            // before inserting. Positions already filled in output_perm are auto-skipped.
-            while shift > 0 || output_perm[target] != 0 {
-                if output_perm[target] != 0 {
-                    target += 1;
-                }
-                else {
-                    target += 1;
-                    shift -= 1;
+            // before inserting.
+
+            // Skip to first non-filled position
+            while output_perm[ind] != 0 {
+                ind += 1;
+            }
+            // For each shift
+            for _ in 0..shift {
+                // Move along 1
+                ind += 1;
+                // Skip to next non-filled position
+                while output_perm[ind] != 0 {
+                    ind += 1;
                 }
             }
-            output_perm[target] = element.clone();
+            output_perm[ind] = token.clone();
         }
         return output_perm
     }
 
     /// Returns a vector of encoded representations for permutations whose 
     /// starting sequence matches perm_target.
-    pub fn possible_encodes(&self, perm_target: &Vec<usize>) -> Vec<VarBaseRepr> {
+    pub fn possible_encodes(&self, perm_target: &Vec<usize>) -> Vec<MixedRadixRepr> {
         let filler = self.sequence_n+1;
-        let mut working_space: Vec<usize> = vec![filler; self.sequence_n];
-        let mut encoded_pos_possibilities: Vec<Vec<usize>> = vec![Vec::new(); self.sequence_n];
+        let mut working_space: MixedRadixRepr = vec![filler; self.sequence_n];
+        let mut encode_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(self.sequence_n);
 
-        // Loop through each number in the core_sequence
-        for (encoded_pos, n) in self.core_sequence.iter().enumerate() {
-            let mut i: usize = 0;
+        // Check for empty perm_target, this means all permutations/encodes fit the target
+        if perm_target.len() == 0 {
+            return self.base_encoder.into_iter().collect();
+        }
+
+        // Calculate the range of encoded values possible that would map to the perm_target
+        for (pos, token) in self.core_sequence.iter().enumerate() {
             let mut shifted: usize = 0;
-            if perm_target.contains(&n) { // Number is part of the perm_target
-                // Set i to first free position in working_space
+            let mut i: usize = 0;
+            let mut matched = false;
+            while i < perm_target.len() {
+                // auto skip over filled spots
                 while working_space[i] != filler {
                     i += 1;
-                }
-                // Increase i until perm_target[i] == n
-                while perm_target[i] != *n {
-                    // Auto skip over filled positions
-                    if working_space[i] != filler {
-                        i += 1;
-                    }
-                    // Track how many unfilled positions are skipped over
-                    else {
-                        i += 1;
-                        shifted += 1;
+                    // refactor this!!!!
+                    if i >= working_space.len() {
+                        return vec![];
                     }
                 }
-                // At this point, perm_target[i] == n
-                working_space[i] = n.clone(); // Fill in working_space[i] to match perm_target
-                // Since n is part of perm_target, we only need to the shifted value for this encoded position
-                encoded_pos_possibilities[encoded_pos].push(shifted);
+                // check for match
+                if &perm_target[i] == token {
+                    working_space[i] = token.clone();
+                    matched = true;
+                    break;
+                }
+                // move to next spot and count it
+                shifted += 1;
+                i += 1;
             }
-            else { // Number is not part of the perm_target
-                // Set i to the first free position in working_space
-                while working_space[i] != filler {
-                    i += 1;
-                }
-                // Keep shifting until we are beyond the length of perm_target
-                while i < perm_target.len() {
-                    // Auto skip over filled positions
-                    if working_space[i] != filler {
-                        i += 1;
-                    }
-                    else { // Track how many unfilled positions are skipped
-                        i += 1;
-                        shifted += 1;
-                    }
-                }
-                let position_base = self.sequence_n-n+1;
-                if shifted >= position_base { // Check if perm_target is possible to match
-                    // For an impossible perm_target, shifted will exceed the maximum possibilities for
-                    // this position (indicated by position_base)
-                    return Vec::new();
-                }
-                else { // perm_target is possible
-                    // All values >=shifted are valid for this encoded position
-                    encoded_pos_possibilities[encoded_pos] = (shifted..self.sequence_n-n+1).collect();
+
+            if matched {
+                encode_ranges.push(shifted..shifted+1);
+            } else {
+                if shifted >= self.base_encoder.bases[pos] {
+                    return vec![]
+                } else {
+                    encode_ranges.push(shifted..self.base_encoder.bases[pos]);
                 }
             }
         }
 
-        // Start combining the numbers at each encoded position into a list of encoded representations
-        let mut bases: Vec<usize> = Vec::with_capacity(self.sequence_n);
-        for possibilites in &encoded_pos_possibilities {
-            bases.push(possibilites.len());
-        }
-        let indexer = VariableBaseSystem::new(bases);
-        let mut repr_possibilities: Vec<VarBaseRepr> = Vec::with_capacity(indexer.max_value);
-
-        // Using VariableBaseSystem to iterate through all combinations of encoded_pos_possibilities
-        // and store each combination into repr_possiblities.
-        for value in 0..indexer.max_value {
-            let curr_indexes = indexer.encode_value(&value);
-            let mut repr: VarBaseRepr = Vec::new();
-            for i in 0..curr_indexes.len() {
-                repr.push(encoded_pos_possibilities[i][curr_indexes[i]].clone());
+        // Go through all the possible encode ranges.
+        // Create another VariableBaseSystem and do some conversion to naturally
+        // go through all the encode value ranges for each position.
+        let system = MixedRadix::new(
+            encode_ranges.iter().map(|x| x.end-x.start).collect()
+        );
+        let mut possibilities: Vec<MixedRadixRepr> = Vec::with_capacity(system.max_value);
+        for mut repr in system.into_iter() {
+            for (i, num) in repr.iter_mut().enumerate() {
+                *num += encode_ranges[i].start;
             }
-            repr_possibilities.push(repr);
+            possibilities.push(repr);
         }
-        return repr_possibilities;
+        return possibilities;
     }
 
     /// Checks if potential_super is a valid superpermutation of self.core_sequence
@@ -225,8 +243,10 @@ impl PermutationsHelper {
 
         // Loop for all possible permutations to be covered
         for _ in 1..self.base_encoder.max_value {
+            let mut trail_matched = false;
+
             // Loop to grab the trailing sequences of superperm
-            for i in (0..self.sequence_n).rev() {
+            for i in (1..self.sequence_n).rev() {
                 let mut perm_matched = false;
                 // Grab the trailing sequence
                 let trailing = &superperm[superperm.len()-i..];
@@ -242,12 +262,24 @@ impl PermutationsHelper {
                     }
                 }
                 if perm_matched {
+                    trail_matched = true;
                     break;
                 }
                 // If loop reaches this point, trailing sequence didn't match the start of any unchecked
                 // perms. Next loop round, the size of the trailing sequence gets smaller.
                 // When i = 0, the trailing sequence will be empty []. In this case the first unchecked
                 // permutation will get appended onto the superperm fully
+            }
+
+            if trail_matched {
+                // No trailing can be used to build off of. We are free to append on an entire permutation onto the super
+                for (i, checked) in perm_checklist.iter().enumerate() {
+                    if *checked == false {
+                        let mut perm = self.encoded_to_perm(&self.base_encoder.encode_value(&i));
+                        superperm.append(&mut perm);
+                        break
+                    }
+                }
             }
         }
         return superperm;
@@ -265,4 +297,45 @@ impl SuperPermHandling for Handle {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn varbasesys_iteration() {
+        let system = MixedRadix::new(vec![3,2,2]);
+        let expected = vec![
+            vec![0,0,0],
+            vec![1,0,0],
+            vec![2,0,0],
+            vec![0,1,0],
+            vec![1,1,0],
+            vec![2,1,0],
+            vec![0,0,1],
+            vec![1,0,1],
+            vec![2,0,1],
+            vec![0,1,1],
+            vec![1,1,1],
+            vec![2,1,1],
+        ];
+        // check if iterator can be used multiple times
+        for _ in 0..2 {
+            for (i, repr) in system.into_iter().enumerate() {
+                assert_eq!(repr, expected[i]);
+            }
+        }
+    }
+
+    #[test]
+    fn varbasesys_edgecase() {
+        let system = MixedRadix::new(vec![1,2]);
+        let expected = vec![
+            vec![0,0],
+            vec![0,1],
+        ];
+        for (i, repr) in system.into_iter().enumerate() {
+            assert_eq!(repr, expected[i]);
+        }
+    }
+}
 

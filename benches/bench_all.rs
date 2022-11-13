@@ -1,7 +1,6 @@
 use super_permutations_attempt::{bruteforce, bruteforce_optimise};
 use super_permutations_attempt::base::SuperPermHandling;
 
-
 use criterion::{
     black_box,
     criterion_group,
@@ -11,10 +10,10 @@ use criterion::{
 
 
 fn bruteforce_test(c: &mut Criterion) {
-    let n: usize = 5;
+    let n: usize = black_box(5);
     let superperm = black_box(bruteforce::Handle::create_superperm(n));
-
-    let mut bruteforce_group = c.benchmark_group("Brute Force");
+    
+    let mut bruteforce_group = c.benchmark_group("bruteforce");
     bruteforce_group.bench_function(
         "Creation", 
         |b| b.iter(|| bruteforce::Handle::create_superperm(n))
@@ -28,10 +27,10 @@ fn bruteforce_test(c: &mut Criterion) {
 }
 
 fn bruteforce_optimise_test(c: &mut Criterion) {
-    let n: usize = 5;
+    let n: usize = black_box(5);
     let superperm = black_box(bruteforce::Handle::create_superperm(n));
 
-    let mut bruteforce_optimise_group = c.benchmark_group("Brute Force Optimised");
+    let mut bruteforce_optimise_group = c.benchmark_group("bruteforce_optimise");
     bruteforce_optimise_group.bench_function(
         "Creation",
         |b| b.iter(|| bruteforce_optimise::Handle::create_superperm(n))
