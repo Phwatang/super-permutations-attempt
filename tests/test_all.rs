@@ -18,10 +18,10 @@ fn common_checks(checker: fn(&Vec<usize>, usize) -> bool, creator: fn(usize) -> 
     // should not affect a valid superpermutation)
     let mut rng = rand::thread_rng();
     for _ in 0..10 {
-        let mut pre = vec![0; rng.gen_range(0..10)];
-        let mut suf = vec![0; rng.gen_range(0..10)];
-        pre.iter_mut().for_each(|x| *x = rng.gen_range(0..4));
-        suf.iter_mut().for_each(|x| *x = rng.gen_range(0..4));
+        let mut pre = vec![0; rng.gen_range(1..10)];
+        let mut suf = vec![0; rng.gen_range(1..10)];
+        pre.iter_mut().for_each(|x| *x = rng.gen_range(1..4));
+        suf.iter_mut().for_each(|x| *x = rng.gen_range(1..4));
         let vec = [pre, vec![1,2,3,1,2,1,3,2,1], suf].concat();
         assert!(checker(&vec, 3));
     }

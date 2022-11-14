@@ -1,12 +1,16 @@
 #![allow(dead_code)]
-// Same goals and fundamental algorithims as bruteforce_no_optimise
+// Same goals and fundamental algorithms as bruteforce_no_optimise
 // except optimisations have been made using better data structuring.
+
+// To do: Improve efficiency futher. Only starts to beat bruteforce.rs at
+//        for superpermutations of 6~7 tokens. <5 tokens, bruteforce.rs
+//        wins by quite a decent margin.
 
 use crate::base::*;
 
 /// Class to encode any value into a different base where
 /// each "position" can be of a different base
-pub struct MixedRadix {
+struct MixedRadix {
     /// The base of each position for this system
     pub bases: Vec<usize>,
     /// The first integer above 0 that is unrepresentable with the bases given
@@ -14,7 +18,7 @@ pub struct MixedRadix {
 }
 
 /// Short for "Mixed Radix Representation".
-/// Data type for a number represented in a mixed radix system
+/// Data type for a value represented in a mixed radix system
 type MixedRadixRepr = Vec<usize>;
 
 impl MixedRadix {
@@ -88,45 +92,49 @@ impl<'a> IntoIterator for &'a MixedRadix {
 }
 
 
-/// Class to help with the handling of permutations for a sequence of the form: (1,2,3,..,n)
-pub struct PermutationsHelper {
-    pub sequence_n: usize,
+
+/// Class to help with the handling of permutations for an arbitrary sequence
+struct PermutationMapper {
     pub core_sequence: Vec<usize>,
-    pub base_encoder: MixedRadix,
+    pub mixed_radix_sys: MixedRadix,
 }
-impl PermutationsHelper {
+impl PermutationMapper {
     // Why use MixedRadix for permutations?
     // Imagine the sequence [1, 2, 3] and all its permutations.
     // When creating a permutation, we have 3 positions to fill up.
     // We insert "1" in one of the three positions. Two positions are left (e.g [_, 1, _])
     // We insert "2" in one of the two positions. One position are left (e.g [2, 1, _])
     // We insert "3" in the final position. Permutation is complete (e.g [2, 1, 3])
-    // With this logic, each permutation can be represented as a number in a variable base system.
+    // With this logic, each permutation can be represented as a number in a mixed radix system.
     // [1, 2, 3] be represented as (0, 0, 0) or 0
     // [2, 1, 3] be represented as (1, 0, 0) or 1
     // [3, 2, 1] be represented as (2, 1, 0) or 5
 
-    /// n sets the upper limit for self.core_sequence.  
+    /// Vector passed in defines the sequence of tokens that all permutations will be built from.
     /// 
-    /// E.g PermutationsHelper::new(5) will focus on permutations of the sequence (1,2,3,4,5)
-    pub fn new(n: usize) -> PermutationsHelper {
-        let bases: Vec<usize> = (1..n+1).rev().collect();
-        let obj = PermutationsHelper{
-            sequence_n: n,
-            core_sequence: (1..n+1).collect(),
-            base_encoder: MixedRadix::new(bases), 
+    /// This vector will be set as the "0th" permutations.
+    /// 
+    /// E.g passing in the vector [1,2,3] will focus on its permutations (i.e [2,1,3], [3,1,2], etc)
+    pub fn new(sequence: Vec<usize>) -> PermutationMapper {
+        let bases: Vec<usize> = (1..sequence.len()+1).rev().collect();
+        let obj = PermutationMapper{
+            core_sequence: sequence,
+            mixed_radix_sys: MixedRadix::new(bases), 
         };
         return obj;
     }
 
-    /// Convert a VariableBaseRepresentation into a distinct permutation
-    pub fn encoded_to_perm(&self, encoded: &MixedRadixRepr) -> Vec<usize> {
-        let mut output_perm: Vec<usize> = vec![0; self.sequence_n];
+    /// Reads a value and maps it to a distinct permutation.
+    /// Passing in 0 will output the same sequence given at instantiation.
+    pub fn value_to_perm(&self, value: &usize) -> Vec<usize> {
+        let mut output_perm: Vec<usize> = vec![0; self.core_sequence.len()];
+        // Convert the value to a useful MixedRadix number
+        let repr = self.mixed_radix_sys.encode_value(value);
         for (pos, token) in self.core_sequence.iter().enumerate() {
-            let shift = encoded[pos];
+            let shift = repr[pos];
             let mut ind: usize = 0;
 
-            // Use each number in the encoded Vec to know how much to shift along
+            // Use each "digit" in the mixedradix representation to know how much to shift along
             // before inserting.
 
             // Skip to first non-filled position
@@ -146,82 +154,109 @@ impl PermutationsHelper {
         }
         return output_perm
     }
+    /// Reads a permutation and maps it to a distinct value.
+    /// Can be thought of as the inverse of value_to_perm.
+    fn perm_to_value(&self, permutation: &Vec<usize>) -> usize {
+        let mut repr: MixedRadixRepr = Vec::with_capacity(self.core_sequence.len());
+        let mut pos_is_filled: Vec<bool> = vec![false; self.core_sequence.len()];
 
-    /// Returns a vector of encoded representations for permutations whose 
-    /// starting sequence matches perm_target.
-    pub fn possible_encodes(&self, perm_target: &Vec<usize>) -> Vec<MixedRadixRepr> {
-        let filler = self.sequence_n+1;
-        let mut working_space: MixedRadixRepr = vec![filler; self.sequence_n];
-        let mut encode_ranges: Vec<std::ops::Range<usize>> = Vec::with_capacity(self.sequence_n);
-
-        // Check for empty perm_target, this means all permutations/encodes fit the target
-        if perm_target.len() == 0 {
-            return self.base_encoder.into_iter().collect();
-        }
-
-        // Calculate the range of encoded values possible that would map to the perm_target
-        for (pos, token) in self.core_sequence.iter().enumerate() {
-            let mut shifted: usize = 0;
-            let mut i: usize = 0;
-            let mut matched = false;
-            while i < perm_target.len() {
-                // auto skip over filled spots
-                while working_space[i] != filler {
-                    i += 1;
-                    // refactor this!!!!
-                    if i >= working_space.len() {
-                        return vec![];
-                    }
-                }
-                // check for match
-                if &perm_target[i] == token {
-                    working_space[i] = token.clone();
-                    matched = true;
-                    break;
-                }
-                // move to next spot and count it
-                shifted += 1;
-                i += 1;
+        for token in self.core_sequence.iter() {
+            let mut shift = 0;
+            let mut ind = 0;
+            // move index to first unfilled position
+            while pos_is_filled[ind] == true {
+                ind += 1;
             }
-
-            if matched {
-                encode_ranges.push(shifted..shifted+1);
-            } else {
-                if shifted >= self.base_encoder.bases[pos] {
-                    return vec![]
-                } else {
-                    encode_ranges.push(shifted..self.base_encoder.bases[pos]);
+            // keep shifting index
+            while *token != permutation[ind] {
+                // keep track of shifts
+                ind += 1;
+                shift += 1;
+                // autoskip over filled positions
+                while pos_is_filled[ind] == true {
+                    ind += 1;
                 }
             }
+            // keep track which position has been filled
+            pos_is_filled[ind] = true;
+            // store the number of shifts
+            repr.push(shift);
         }
-
-        // Go through all the possible encode ranges.
-        // Create another VariableBaseSystem and do some conversion to naturally
-        // go through all the encode value ranges for each position.
-        let system = MixedRadix::new(
-            encode_ranges.iter().map(|x| x.end-x.start).collect()
-        );
-        let mut possibilities: Vec<MixedRadixRepr> = Vec::with_capacity(system.max_value);
-        for mut repr in system.into_iter() {
-            for (i, num) in repr.iter_mut().enumerate() {
-                *num += encode_ranges[i].start;
-            }
-            possibilities.push(repr);
-        }
-        return possibilities;
+        return self.mixed_radix_sys.decode_representation(&repr);
     }
 
-    /// Checks if potential_super is a valid superpermutation of self.core_sequence
-    pub fn check_superperm(&self, potential_super: &Vec<usize>) -> bool {
+    /// Returns a vector of values in which if they were passed into value_to_perm,
+    /// the resulting permutation would match the perm_target.
+    /// 
+    /// The permutation target can be shorter than the sequence passed in at instantiation.
+    /// If this is the case, this method will look for permutations whose starting elements matches
+    /// the perm_target.
+    pub fn possible_values_for(&self, perm_target: &Vec<usize>) -> Vec<usize> {
+        let n = perm_target.len();
+        // Check for empty perm_target, this means all permutations "fit" the target
+        if n == 0 {
+            return (1..self.mixed_radix_sys.max_value).collect();
+        }
+        
+        let mut core_leftover = self.core_sequence.clone();
+        core_leftover.retain(|x| !perm_target.contains(x));
+        
+        // Calculate "minimum" representation in which its value would map to the perm_target
+        let mut temp_perm = perm_target.clone();
+        temp_perm.append(&mut core_leftover.clone());
+        let min_repr = self.mixed_radix_sys.encode_value(
+            &self.perm_to_value(&temp_perm)
+        );
+        
+        // Calculate "maximum" representation in which its value would map to the perm_target
+        temp_perm = perm_target.clone();
+        temp_perm.append(&mut core_leftover.into_iter().rev().collect());
+        let max_repr = self.mixed_radix_sys.encode_value(
+            &self.perm_to_value(&temp_perm)
+        );
+        
+        // Use max and min representations to get range of possible representations
+        let sys = MixedRadix::new(
+            max_repr
+                .iter()
+                .zip(min_repr.clone())
+                .map(|(max, min)| max+1-min)
+                .collect()
+        );
+        // Iterate through all the representations that fit between max and min repr and store
+        // the associated value. (Keep note of the difference between "representation" and "value")
+        let mut values = Vec::with_capacity(sys.max_value);
+        for repr in sys.into_iter() {
+            let cur_val = min_repr
+                    .iter()
+                    .zip(repr)
+                    .map(|(min, num)| min+num)
+                    .collect();
+            values.push(self.mixed_radix_sys.decode_representation(&cur_val));
+        }
+
+        return values;
+    }
+}
+
+
+pub struct Handle;
+impl SuperPermHandling for Handle {
+    fn check_superperm(sequence: &Vec<usize>, n_tokens: usize) -> bool {
+        let mapper = PermutationMapper::new((1..n_tokens+1).collect());
+
         // Brute force approach
-        let mut perm_checklist: Vec<bool> = vec![false; self.base_encoder.max_value];
-        // Keep slicing over potential_super and check if the slice is a permutation
-        for i in 0..potential_super.len()-self.sequence_n+1 {
-            let slice = &potential_super[i..i+self.sequence_n];
-            let encodes = self.possible_encodes(&slice.to_vec());
-            // encodes may be an empty list thus check with a for loop
-            for encode in &encodes {
-                perm_checklist[self.base_encoder.decode_representation(encode)] = true;
+        let mut perm_checklist: Vec<bool> = vec![false; mapper.mixed_radix_sys.max_value];
+        // Perform rolling window/slice over potential_super and check if the slice is a permutation
+        for slice in sequence.windows(mapper.core_sequence.len()) {
+            // Check for repeated elements in trailing. Repeated elements 
+            if (1..slice.len()).any(|i| slice[i..].contains(&slice[i-1])) {
+                continue;
+            }
+            let values = mapper.possible_values_for(&slice.to_vec());
+            // values may be an empty list thus check with a for loop
+            for value in values {
+                perm_checklist[value] = true;
             }
         }
         // Check if all permutations have been seen
@@ -234,29 +269,34 @@ impl PermutationsHelper {
         return true;
     }
 
-    /// Returns a valid superpermutation of self.core_sequence
-    pub fn create_superperm(&self) -> Vec<usize> {
+    fn create_superperm(n_tokens: usize) -> Vec<usize> {
+        let mapper = PermutationMapper::new((1..n_tokens+1).collect());
+
         // Set an intial sequence to build the superperm from before starting algo
-        let mut superperm: Vec<usize> = (1..self.sequence_n+1).collect();
-        let mut perm_checklist: Vec<bool> = vec![false; self.base_encoder.max_value];
+        let mut superperm: Vec<usize> = (1..mapper.core_sequence.len()+1).collect();
+        let mut perm_checklist: Vec<bool> = vec![false; mapper.mixed_radix_sys.max_value];
         perm_checklist[0] = true;
 
         // Loop for all possible permutations to be covered
-        for _ in 1..self.base_encoder.max_value {
+        for _ in 1..mapper.mixed_radix_sys.max_value {
             let mut trail_matched = false;
 
             // Loop to grab the trailing sequences of superperm
-            for i in (1..self.sequence_n).rev() {
+            for i in (1..mapper.core_sequence.len()).rev() {
                 let mut perm_matched = false;
                 // Grab the trailing sequence
-                let trailing = &superperm[superperm.len()-i..];
+                let trailing = &superperm[superperm.len()-i..].to_vec();
+                // Check for repeated elements in trailing
+                if (1..trailing.len()).any(|i| trailing[i..].contains(&trailing[i-1])) {
+                    continue;
+                }
+
                 // Check if trailing equals the start of any perms left to be checked off
-                for encode in &self.possible_encodes(&trailing.to_vec()) {
-                    let value = self.base_encoder.decode_representation(encode);
+                for value in mapper.possible_values_for(&trailing) {
                     if perm_checklist[value] == false { // Perm has not been checked off
                         // Check off perm and append rest of it onto superperm
                         perm_checklist[value] = true;
-                        superperm.extend_from_slice(&self.encoded_to_perm(encode)[i..]);
+                        superperm.extend_from_slice(&mapper.value_to_perm(&value)[i..]);
                         perm_matched = true;
                         break;
                     }
@@ -271,11 +311,11 @@ impl PermutationsHelper {
                 // permutation will get appended onto the superperm fully
             }
 
-            if trail_matched {
+            if !trail_matched {
                 // No trailing can be used to build off of. We are free to append on an entire permutation onto the super
                 for (i, checked) in perm_checklist.iter().enumerate() {
                     if *checked == false {
-                        let mut perm = self.encoded_to_perm(&self.base_encoder.encode_value(&i));
+                        let mut perm = mapper.value_to_perm(&i);
                         superperm.append(&mut perm);
                         break
                     }
@@ -286,23 +326,12 @@ impl PermutationsHelper {
     }
 }
 
-pub struct Handle;
-impl SuperPermHandling for Handle {
-    fn check_superperm(sequence: &Vec<usize>, n_tokens: usize) -> bool {
-        return PermutationsHelper::new(n_tokens).check_superperm(sequence);
-    }
-
-    fn create_superperm(n_tokens: usize) -> Vec<usize> {
-        return PermutationsHelper::new(n_tokens).create_superperm();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn varbasesys_iteration() {
+    fn mixedradix_iteration() {
         let system = MixedRadix::new(vec![3,2,2]);
         let expected = vec![
             vec![0,0,0],
@@ -327,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    fn varbasesys_edgecase() {
+    fn mixedradix_edgecase() {
         let system = MixedRadix::new(vec![1,2]);
         let expected = vec![
             vec![0,0],
@@ -335,6 +364,18 @@ mod tests {
         ];
         for (i, repr) in system.into_iter().enumerate() {
             assert_eq!(repr, expected[i]);
+        }
+    }
+
+    #[test]
+    fn encode_and_decode_permutations() {
+        let helper = PermutationMapper::new((1..6).collect());
+
+        for i in 1..helper.mixed_radix_sys.max_value {
+            assert_eq!(
+                helper.perm_to_value(&helper.value_to_perm(&i)),
+                i
+            );
         }
     }
 }

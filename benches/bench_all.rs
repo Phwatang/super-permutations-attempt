@@ -8,9 +8,10 @@ use criterion::{
     Criterion
 };
 
+const N: usize = 5;
 
 fn bruteforce_test(c: &mut Criterion) {
-    let n: usize = black_box(5);
+    let n: usize = black_box(N);
     let superperm = black_box(bruteforce::Handle::create_superperm(n));
     
     let mut bruteforce_group = c.benchmark_group("bruteforce");
@@ -27,7 +28,7 @@ fn bruteforce_test(c: &mut Criterion) {
 }
 
 fn bruteforce_optimise_test(c: &mut Criterion) {
-    let n: usize = black_box(5);
+    let n: usize = black_box(N);
     let superperm = black_box(bruteforce::Handle::create_superperm(n));
 
     let mut bruteforce_optimise_group = c.benchmark_group("bruteforce_optimise");
