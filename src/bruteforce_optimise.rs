@@ -156,33 +156,51 @@ impl PermutationMapper {
     }
     /// Reads a permutation and maps it to a distinct value.
     /// Can be thought of as the inverse of value_to_perm.
-    fn perm_to_value(&self, permutation: &Vec<usize>) -> usize {
+    /// 
+    /// The value resulting from this method should be able to be passed
+    /// back into value_to_perm to get back the original permutation.
+    /// 
+    /// A return of None indicates that the permutation passed in is not a
+    /// valid permutation of the sequence given at instantiation.
+    fn perm_to_value(&self, permutation: &Vec<usize>) -> Option<usize> {
+        // if the lengths of core_sequence and permutation doesn't match then
+        // mapping to a value is obviously impossible
+        if permutation.len() != self.core_sequence.len() {
+            return None;
+        }
+        
         let mut repr: MixedRadixRepr = Vec::with_capacity(self.core_sequence.len());
         let mut pos_is_filled: Vec<bool> = vec![false; self.core_sequence.len()];
+        let max_ind = self.core_sequence.len();
 
         for token in self.core_sequence.iter() {
             let mut shift = 0;
             let mut ind = 0;
             // move index to first unfilled position
-            while pos_is_filled[ind] == true {
+            while ind < max_ind && pos_is_filled[ind] == true {
                 ind += 1;
             }
             // keep shifting index
-            while *token != permutation[ind] {
+            while ind < max_ind && *token != permutation[ind] {
                 // keep track of shifts
                 ind += 1;
                 shift += 1;
                 // autoskip over filled positions
-                while pos_is_filled[ind] == true {
+                while ind < max_ind && pos_is_filled[ind] == true {
                     ind += 1;
                 }
+            }
+            // if the index rolls off the "edge" whilst looking for a token match
+            // then the permutation passed initially passed in is impossible to map to
+            if ind >= max_ind {
+                return None;
             }
             // keep track which position has been filled
             pos_is_filled[ind] = true;
             // store the number of shifts
             repr.push(shift);
         }
-        return self.mixed_radix_sys.decode_representation(&repr);
+        return Some(self.mixed_radix_sys.decode_representation(&repr));
     }
 
     /// Returns a vector of values in which if they were passed into value_to_perm,
@@ -201,19 +219,23 @@ impl PermutationMapper {
         let mut core_leftover = self.core_sequence.clone();
         core_leftover.retain(|x| !perm_target.contains(x));
         
-        // Calculate "minimum" representation in which its value would map to the perm_target
+        // Calculate the "minimum" representation in which its value would map to the perm_target
         let mut temp_perm = perm_target.clone();
         temp_perm.append(&mut core_leftover.clone());
-        let min_repr = self.mixed_radix_sys.encode_value(
-            &self.perm_to_value(&temp_perm)
-        );
+        // if no value can be mapped for temp_perm then no values are possible
+        let Some(val) = self.perm_to_value(&temp_perm) else {
+            return vec![];
+        };
+        let min_repr = self.mixed_radix_sys.encode_value(&val);
         
-        // Calculate "maximum" representation in which its value would map to the perm_target
+        // Calculate the "maximum" representation in which its value would map to the perm_target
         temp_perm = perm_target.clone();
         temp_perm.append(&mut core_leftover.into_iter().rev().collect());
-        let max_repr = self.mixed_radix_sys.encode_value(
-            &self.perm_to_value(&temp_perm)
-        );
+        // if no value can be mapped for temp_perm then no values are possible
+        let Some(val) = self.perm_to_value(&temp_perm) else {
+            return vec![];
+        };
+        let max_repr = self.mixed_radix_sys.encode_value(&val);
         
         // Use max and min representations to get range of possible representations
         let sys = MixedRadix::new(
@@ -249,10 +271,6 @@ impl SuperPermHandling for Handle {
         let mut perm_checklist: Vec<bool> = vec![false; mapper.mixed_radix_sys.max_value];
         // Perform rolling window/slice over potential_super and check if the slice is a permutation
         for slice in sequence.windows(mapper.core_sequence.len()) {
-            // Check for repeated elements in trailing. Repeated elements 
-            if (1..slice.len()).any(|i| slice[i..].contains(&slice[i-1])) {
-                continue;
-            }
             let values = mapper.possible_values_for(&slice.to_vec());
             // values may be an empty list thus check with a for loop
             for value in values {
@@ -286,11 +304,6 @@ impl SuperPermHandling for Handle {
                 let mut perm_matched = false;
                 // Grab the trailing sequence
                 let trailing = &superperm[superperm.len()-i..].to_vec();
-                // Check for repeated elements in trailing
-                if (1..trailing.len()).any(|i| trailing[i..].contains(&trailing[i-1])) {
-                    continue;
-                }
-
                 // Check if trailing equals the start of any perms left to be checked off
                 for value in mapper.possible_values_for(&trailing) {
                     if perm_checklist[value] == false { // Perm has not been checked off
@@ -374,8 +387,24 @@ mod tests {
         for i in 1..helper.mixed_radix_sys.max_value {
             assert_eq!(
                 helper.perm_to_value(&helper.value_to_perm(&i)),
-                i
+                Some(i)
             );
+        }
+    }
+
+    #[test]
+    fn impossible_permutations() {
+        let helper = PermutationMapper::new((1..6).collect());
+        let impossible = vec![
+            vec![1,2,3,4,4],
+            vec![0,2,3,4,5],
+            vec![1,2,3,2,5],
+            vec![1,2,3,5],
+            vec![1,2,3,4,5,6],
+        ];
+        for imp in impossible {
+            println!("{:?}", imp);
+            assert_eq!(helper.perm_to_value(&imp), None);
         }
     }
 }
