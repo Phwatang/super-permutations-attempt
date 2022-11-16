@@ -20,7 +20,7 @@ fn generate_perms(n: usize) -> Vec<Vec<usize>> {
 impl SuperPermHandling for Handle {
     /// Check if a vector of numbers is a valid superpermutation for a sequence of [1..perm_n]
     /// E.g check_superperm([1,2,1], 2) will check if [1,2,1] is a superperm of [1,2]
-    fn check_superperm(potential_super: &Vec<usize>, perm_n: usize) -> bool {
+    fn check_superperm(&self, potential_super: &Vec<usize>, perm_n: usize) -> bool {
         // Brute force method
         let perms = generate_perms(perm_n);
         // Create boolean for each perm to check
@@ -47,7 +47,7 @@ impl SuperPermHandling for Handle {
     /// Returns a valid superpermutation for the sequence of [1..perm_n]
     /// Does not guarantee minimality for the superpermutation returned
     /// E.g create_superperm(3) = [1,2,3,1,2,1,3,2,1]
-    fn create_superperm(perm_n: usize) -> Vec<usize> {
+    fn create_superperm(&self, perm_n: usize) -> Vec<usize> {
         let mut superperm: Vec<usize> = Vec::new();
         let all_perms = generate_perms(perm_n);
         let mut perm_checklist: Vec<bool> = vec![false; all_perms.len()];

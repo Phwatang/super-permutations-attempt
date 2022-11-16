@@ -2,7 +2,7 @@
 // Same goals and fundamental algorithms as bruteforce_no_optimise
 // except optimisations have been made using better data structuring.
 
-// To do: Improve efficiency futher. Only starts to beat bruteforce.rs at
+// To do: Improve efficiency futher. Only starts to beat bruteforce.rs
 //        for superpermutations of 6~7 tokens. <5 tokens, bruteforce.rs
 //        wins by quite a decent margin.
 
@@ -264,7 +264,7 @@ impl PermutationMapper {
 
 pub struct Handle;
 impl SuperPermHandling for Handle {
-    fn check_superperm(sequence: &Vec<usize>, n_tokens: usize) -> bool {
+    fn check_superperm(&self, sequence: &Vec<usize>, n_tokens: usize) -> bool {
         let mapper = PermutationMapper::new((1..n_tokens+1).collect());
 
         // Brute force approach
@@ -287,7 +287,7 @@ impl SuperPermHandling for Handle {
         return true;
     }
 
-    fn create_superperm(n_tokens: usize) -> Vec<usize> {
+    fn create_superperm(&self, n_tokens: usize) -> Vec<usize> {
         let mapper = PermutationMapper::new((1..n_tokens+1).collect());
 
         // Set an intial sequence to build the superperm from before starting algo

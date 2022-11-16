@@ -10,38 +10,29 @@ use criterion::{
 
 const N: usize = 5;
 
-fn bruteforce_test(c: &mut Criterion) {
+fn common_bench(c: &mut Criterion, superperm_h: impl SuperPermHandling, group_name: &String) {
     let n: usize = black_box(N);
-    let superperm = black_box(bruteforce::Handle::create_superperm(n));
-    
-    let mut bruteforce_group = c.benchmark_group("bruteforce");
+    let superperm = black_box(superperm_h.create_superperm(n));
+    let mut bruteforce_group = c.benchmark_group(group_name);
+
     bruteforce_group.bench_function(
-        "Creation", 
-        |b| b.iter(|| bruteforce::Handle::create_superperm(n))
+        "creation",
+        |b| b.iter(|| superperm_h.create_superperm(n))
     );
     bruteforce_group.bench_function(
-        "Checking", 
-        |b| b.iter(|| bruteforce::Handle::check_superperm(&superperm, n))
-    );
+        "checking",
+        |b| b.iter(|| superperm_h.check_superperm(&superperm, n))
+    );    
     bruteforce_group.finish();
-
 }
 
-fn bruteforce_optimise_test(c: &mut Criterion) {
-    let n: usize = black_box(N);
-    let superperm = black_box(bruteforce::Handle::create_superperm(n));
-
-    let mut bruteforce_optimise_group = c.benchmark_group("bruteforce_optimise");
-    bruteforce_optimise_group.bench_function(
-        "Creation",
-        |b| b.iter(|| bruteforce_optimise::Handle::create_superperm(n))
-    );
-    bruteforce_optimise_group.bench_function(
-        "Checking", 
-        |b| b.iter(|| bruteforce_optimise::Handle::check_superperm(&superperm, n))
-    );
-    bruteforce_optimise_group.finish();
+fn bruteforce_bench(c: &mut Criterion) {
+    common_bench(c, bruteforce::Handle{}, &String::from("bruteforce"));
 }
 
-criterion_group!(benches, bruteforce_test, bruteforce_optimise_test);
+fn bruteforce_optimise_bench(c: &mut Criterion) {
+    common_bench(c, bruteforce_optimise::Handle{}, &String::from("bruteforce_optimise"));
+}
+
+criterion_group!(benches, bruteforce_bench, bruteforce_optimise_bench);
 criterion_main!(benches);
